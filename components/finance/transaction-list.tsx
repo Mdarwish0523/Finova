@@ -2,13 +2,13 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { ArrowDownRight, ArrowUpRight, Edit3, LoaderCircle, Trash2 } from "lucide-react";
-import type { Tables } from "@/lib/database.types";
+import type { transactions, recurringExpenses } from "@/lib/db/schema";
 import { deleteTransaction } from "@/app/protected/actions";
 import { formatCurrency, formatDate } from "@/lib/finance/format";
 import { TransactionDialog } from "@/components/finance/transaction-dialog";
 
-type Transaction = Tables<"transactions">;
-type Recurring = Pick<Tables<"recurring_expenses">, "id" | "name">;
+type Transaction = typeof transactions.$inferSelect;
+type Recurring = Pick<typeof recurringExpenses.$inferSelect, "id" | "name">;
 
 export function TransactionList({ transactions, recurring, currency }: {
   transactions: Transaction[];
