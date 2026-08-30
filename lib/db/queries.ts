@@ -9,7 +9,6 @@ import {
 
 import { db } from "@/lib/db";
 import {
-  aiReports,
   freeTrials,
   recurringExpenses,
   recurringPayments,
@@ -93,24 +92,6 @@ export function getRecurringPayments() {
       period_start: recurringPayments.period_start,
     })
     .from(recurringPayments)
-    .all();
-}
-
-export function getLatestAiReport() {
-  return db
-    .select()
-    .from(aiReports)
-    .orderBy(desc(aiReports.generated_at))
-    .limit(1)
-    .all()[0];
-}
-
-export function getAiReportHistory(limit = 12) {
-  return db
-    .select()
-    .from(aiReports)
-    .orderBy(desc(aiReports.generated_at))
-    .limit(limit)
     .all();
 }
 
