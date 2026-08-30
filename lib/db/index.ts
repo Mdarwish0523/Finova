@@ -8,15 +8,9 @@ import * as schema from "./schema";
 const dataDirectory = path.join(process.cwd(), "data");
 mkdirSync(dataDirectory, { recursive: true });
 
-const databasePath = path.join(
-  dataDirectory,
-  "finova.db",
-);
-
+const databasePath = path.join(dataDirectory, "finova.db");
 const sqlite = new BetterSqlite3(databasePath);
 
-// Allow another Next.js worker to finish a brief database operation
-// instead of immediately throwing SQLITE_BUSY.
 sqlite.pragma("busy_timeout = 10000");
 sqlite.pragma("foreign_keys = ON");
 
@@ -66,29 +60,12 @@ sqlite.exec(`
     UNIQUE (recurring_expense_id, period_start)
   );
 
-  CREATE TABLE IF NOT EXISTS ai_reports (
-    id TEXT PRIMARY KEY NOT NULL,
-    period_type TEXT NOT NULL
-      CHECK (period_type IN ('daily', 'weekly', 'monthly')),
-    period_start TEXT NOT NULL,
-    period_end TEXT NOT NULL,
-    metrics TEXT NOT NULL DEFAULT '{}',
-    analysis TEXT NOT NULL DEFAULT '{}',
-    model TEXT NOT NULL,
-    generated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (period_type, period_start, period_end)
-  );
-
   CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY NOT NULL DEFAULT 1,
     currency TEXT NOT NULL DEFAULT 'USD',
     timezone TEXT NOT NULL DEFAULT 'America/New_York',
     monthly_budget_cents INTEGER,
     starting_balance_cents INTEGER NOT NULL DEFAULT 0,
-    ai_analysis_enabled INTEGER NOT NULL DEFAULT 1,
-    daily_analysis_enabled INTEGER NOT NULL DEFAULT 1,
-    weekly_analysis_enabled INTEGER NOT NULL DEFAULT 1,
-    monthly_analysis_enabled INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
@@ -124,9 +101,6 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS recurring_payments_period_index
     ON recurring_payments(period_start DESC);
 
-  CREATE INDEX IF NOT EXISTS ai_reports_period_index
-    ON ai_reports(period_type, period_start DESC);
-
   CREATE INDEX IF NOT EXISTS free_trials_status_charge_index
     ON free_trials(status, charge_date);
 
@@ -134,8 +108,6 @@ sqlite.exec(`
   VALUES (1);
 `);
 
-export const db = drizzle(sqlite, {
-  schema,
-});
+export const db = drizzle(sqlite, { schema });
 
 export { sqlite };
