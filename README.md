@@ -17,7 +17,7 @@ All finance data is stored locally in `data/finova.db`.
 
 ## Requirements
 
-- Node.js 20.9 or newer
+- Node.js 22 or newer
 - npm
 - Git, if cloning the repository instead of downloading the ZIP
 
