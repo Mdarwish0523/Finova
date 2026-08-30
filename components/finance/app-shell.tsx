@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { BarChart3, CalendarClock, Hourglass, LayoutDashboard, Plus, ReceiptText, Settings, WalletCards } from "lucide-react";
-import type { Tables } from "@/lib/database.types";
-import { AppLogoutButton } from "@/components/app-logout-button";
+import type { recurringExpenses } from "@/lib/db/schema";
 import { TransactionDialog } from "@/components/finance/transaction-dialog";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +22,7 @@ export function AppShell({
   recurring,
 }: {
   children: ReactNode;
-  recurring: Pick<Tables<"recurring_expenses">, "id" | "name">[];
+  recurring: Pick<typeof recurringExpenses.$inferSelect, "id" | "name">[];
 }) {
   const pathname = usePathname();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -53,17 +52,16 @@ export function AppShell({
           })}
         </nav>
         <div className="mt-auto rounded-[22px] bg-gradient-to-br from-slate-950 to-blue-950 p-4 text-white">
-          <p className="text-sm font-bold">Private by design</p>
-          <p className="mt-1 text-xs leading-5 text-blue-100/70">Your finance workspace is protected by owner-only access and row security.</p>
+          <p className="text-sm font-bold">Local by design</p>
+          <p className="mt-1 text-xs leading-5 text-blue-100/70">Your finance data is stored locally in your Finova SQLite database.</p>
         </div>
-        <div className="mt-4"><AppLogoutButton /></div>
       </aside>
 
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-blue-100/70 bg-white/90 px-4 backdrop-blur-xl lg:hidden">
         <Link href="/protected" className="flex items-center gap-2.5 font-extrabold tracking-tight text-slate-950">
           <span className="grid size-9 place-items-center rounded-xl bg-blue-700 text-white"><WalletCards className="size-5" /></span>Finova
         </Link>
-        <AppLogoutButton compact />
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-blue-700">Local</span>
       </header>
 
       <main className="min-w-0 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:ml-64 lg:pb-10">

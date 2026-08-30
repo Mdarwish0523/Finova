@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CheckCircle2, LoaderCircle, X } from "lucide-react";
-import type { Tables } from "@/lib/database.types";
+import type { transactions, recurringExpenses } from "@/lib/db/schema";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/lib/finance/constants";
 import { saveTransaction } from "@/app/protected/actions";
 import { dateInTimeZone } from "@/lib/finance/dates";
 
-type Recurring = Pick<Tables<"recurring_expenses">, "id" | "name">;
-type Transaction = Tables<"transactions">;
+type Recurring = Pick<typeof recurringExpenses.$inferSelect, "id" | "name">;
+type Transaction = typeof transactions.$inferSelect;
 
 export function TransactionDialog({
   open,

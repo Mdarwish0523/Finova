@@ -1,7 +1,7 @@
-import type { Tables } from "@/lib/database.types";
+import type { transactions } from "@/lib/db/schema";
 import { enumerateDates } from "@/lib/finance/dates";
 
-export type Transaction = Tables<"transactions">;
+export type Transaction = typeof transactions.$inferSelect;
 
 export type FinancialMetrics = {
   incomeCents: number;

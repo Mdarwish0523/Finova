@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { CalendarCheck, Edit3, LoaderCircle, Pause, Play, Plus, Trash2, X } from "lucide-react";
-import type { Tables } from "@/lib/database.types";
+import type { recurringExpenses } from "@/lib/db/schema";
 import { deleteRecurringExpense, markRecurringPaid, saveRecurringExpense, toggleRecurringExpense } from "@/app/protected/actions";
 import { EXPENSE_CATEGORIES } from "@/lib/finance/constants";
 import { formatCurrency } from "@/lib/finance/format";
 
-type Bill = Tables<"recurring_expenses"> & { paid: boolean; status: "paid" | "overdue" | "upcoming" | "inactive" };
+type Bill = typeof recurringExpenses.$inferSelect & { paid: boolean; status: "paid" | "overdue" | "upcoming" | "inactive" };
 
 function BillForm({ bill, onClose }: { bill: Bill | null | undefined; onClose: () => void }) {
   const [pending, startTransition] = useTransition();

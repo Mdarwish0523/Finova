@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { Filter, Search } from "lucide-react";
-import { requireOwner } from "@/lib/auth";
+import {
+  getRecurringNames,
+  getSettings,
+  getTransactions,
+} from "@/lib/db/queries";
 import { ALL_CATEGORIES } from "@/lib/finance/constants";
 import { AddTransactionButton } from "@/components/finance/transaction-dialog";
 import { PageHeader } from "@/components/finance/page-header";
@@ -12,28 +16,74 @@ type Params = { q?: string; kind?: string; category?: string; start?: string; en
 
 async function TransactionsContent({ searchParams }: { searchParams: Promise<Params> }) {
   const params = await searchParams;
-  const { userId, supabase } = await requireOwner();
-  let query = supabase.from("transactions").select("*").eq("user_id", userId);
-  if (params.kind === "income" || params.kind === "expense") query = query.eq("kind", params.kind);
-  if (
-    params.category &&
-    ALL_CATEGORIES.some((category) => category === params.category)
-  ) {
-    query = query.eq("category", params.category);
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(params.start ?? "")) query = query.gte("transaction_date", params.start!);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(params.end ?? "")) query = query.lte("transaction_date", params.end!);
 
-  const [{ data, error }, { data: recurring }, { data: settings }] = await Promise.all([
-    query.order("transaction_date", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("recurring_expenses").select("id, name").eq("user_id", userId).order("name"),
-    supabase.from("user_settings").select("currency").eq("user_id", userId).maybeSingle(),
-  ]);
-  if (error) throw new Error("Unable to load transactions");
-  const needle = params.q?.trim().toLocaleLowerCase();
-  const transactions = needle
-    ? (data ?? []).filter((transaction) => [transaction.merchant, transaction.description, transaction.notes, transaction.category].some((field) => field?.toLocaleLowerCase().includes(needle)))
-    : data ?? [];
+  const recurring = getRecurringNames();
+  const settings = getSettings();
+
+  let transactions = getTransactions().filter(
+    (transaction) => {
+      if (
+        params.kind === "income" ||
+        params.kind === "expense"
+      ) {
+        if (transaction.kind !== params.kind) {
+          return false;
+        }
+      }
+
+      if (
+        params.category &&
+        ALL_CATEGORIES.some(
+          (category) =>
+            category === params.category,
+        ) &&
+        transaction.category !== params.category
+      ) {
+        return false;
+      }
+
+      if (
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          params.start ?? "",
+        ) &&
+        transaction.transaction_date <
+          params.start!
+      ) {
+        return false;
+      }
+
+      if (
+        /^\d{4}-\d{2}-\d{2}$/.test(
+          params.end ?? "",
+        ) &&
+        transaction.transaction_date >
+          params.end!
+      ) {
+        return false;
+      }
+
+      return true;
+    },
+  );
+
+  const needle =
+    params.q?.trim().toLocaleLowerCase();
+
+  if (needle) {
+    transactions = transactions.filter(
+      (transaction) =>
+        [
+          transaction.merchant,
+          transaction.description,
+          transaction.notes,
+          transaction.category,
+        ].some((field) =>
+          field
+            ?.toLocaleLowerCase()
+            .includes(needle),
+        ),
+    );
+  }
 
   return (
     <div className="space-y-7">
@@ -47,7 +97,7 @@ async function TransactionsContent({ searchParams }: { searchParams: Promise<Par
         <button className="secondary-button"><Filter className="size-4" />Filter</button>
       </form>
       <p className="px-1 text-sm font-semibold text-slate-500">{transactions.length} transaction{transactions.length === 1 ? "" : "s"} · newest first</p>
-      <TransactionList transactions={transactions} recurring={recurring ?? []} currency={settings?.currency ?? "USD"} />
+      <TransactionList transactions={transactions} recurring={recurring} currency={settings?.currency ?? "USD"} />
     </div>
   );
 }

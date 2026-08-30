@@ -1,6 +1,13 @@
+import { connection } from "next/server";
 import Link from "next/link";
-import { ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CircleDollarSign, CreditCard, Hourglass, Landmark, Scale, Sparkles, TrendingDown } from "lucide-react";
-import { requireOwner } from "@/lib/auth";
+import { ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CircleDollarSign, CreditCard, Hourglass, Landmark, Scale, TrendingDown } from "lucide-react";
+import {
+  getActiveFreeTrials,
+  getActiveRecurringExpenses,
+  getRecurringPayments,
+  getSettings,
+  getTransactions,
+} from "@/lib/db/queries";
 import { calculateMetrics, sumByKind, type Transaction } from "@/lib/finance/calculations";
 import { dateInTimeZone, endOfMonth, rangeForPeriod, shiftDate, startOfMonth, startOfWeek } from "@/lib/finance/dates";
 import { formatCurrency, formatDate, percentChange } from "@/lib/finance/format";
@@ -8,29 +15,17 @@ import { AddTransactionButton } from "@/components/finance/transaction-dialog";
 import { CategoryChart, TrendChart } from "@/components/finance/charts";
 import { PageHeader, SectionHeading } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
-import type { Json } from "@/lib/database.types";
-
-function summaryFromAnalysis(analysis: Json) {
-  return analysis && typeof analysis === "object" && !Array.isArray(analysis) && typeof analysis.summary === "string"
-    ? analysis.summary
-    : null;
-}
 
 export default async function DashboardContent() {
-  const { userId, supabase } = await requireOwner();
-  const [{ data: settings }, { data: transactionData, error: transactionError }, { data: recurring, error: recurringError }, { data: payments }, { data: reports }, { data: freeTrials, error: trialsError }] = await Promise.all([
-    supabase.from("user_settings").select("*").eq("user_id", userId).maybeSingle(),
-    supabase.from("transactions").select("*").eq("user_id", userId).order("transaction_date", { ascending: false }).order("created_at", { ascending: false }),
-    supabase.from("recurring_expenses").select("*").eq("user_id", userId).eq("active", true).order("due_day"),
-    supabase.from("recurring_payments").select("recurring_expense_id, period_start").eq("user_id", userId),
-    supabase.from("ai_reports").select("analysis, generated_at, period_type, period_start, period_end").eq("user_id", userId).order("generated_at", { ascending: false }).limit(1),
-    supabase.from("free_trials").select("id, service_name, charge_date, card_label").eq("user_id", userId).eq("status", "active").order("charge_date"),
-  ]);
-  if (transactionError || recurringError || trialsError) throw new Error("Unable to load dashboard data");
+  await connection();
+  const settings = getSettings();
+  const transactions = getTransactions() as Transaction[];
+  const recurring = getActiveRecurringExpenses();
+  const payments = getRecurringPayments();
+  const freeTrials = getActiveFreeTrials();
 
-  const transactions = (transactionData ?? []) as Transaction[];
   const currency = settings?.currency ?? "USD";
-  const timezone = settings?.timezone ?? process.env.APP_TIMEZONE ?? "America/New_York";
+  const timezone = settings?.timezone ?? "America/New_York";
   const today = dateInTimeZone(new Date(), timezone);
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
@@ -40,12 +35,11 @@ export default async function DashboardContent() {
   const todayMetrics = calculateMetrics(transactions, today, today);
   const weekMetrics = calculateMetrics(transactions, startOfWeek(today), today);
   const balance = Number(settings?.starting_balance_cents ?? 0) + sumByKind(transactions, "income") - sumByKind(transactions, "expense");
-  const recurringTotal = (recurring ?? []).reduce((sum, item) => sum + Number(item.amount_cents), 0);
+  const recurringTotal = recurring.reduce((sum, item) => sum + Number(item.amount_cents), 0);
   const change = percentChange(monthMetrics.expenseCents, previousMetrics.expenseCents);
-  const paidSet = new Set((payments ?? []).filter((payment) => payment.period_start === monthStart).map((payment) => payment.recurring_expense_id));
+  const paidSet = new Set(payments.filter((payment) => payment.period_start === monthStart).map((payment) => payment.recurring_expense_id));
   const recent = transactions.slice(0, 6);
-  const latest = reports?.[0];
-  const upcomingTrials = (freeTrials ?? []).filter((trial) => trial.charge_date >= today && trial.charge_date <= shiftDate(today, 7));
+  const upcomingTrials = freeTrials.filter((trial) => trial.charge_date >= today && trial.charge_date <= shiftDate(today, 7));
 
   return (
     <div className="space-y-7">
@@ -77,7 +71,7 @@ export default async function DashboardContent() {
         <StatCard label="Spending this month" value={formatCurrency(monthMetrics.expenseCents, currency)} detail={change === null ? "No previous-period baseline" : `${Math.abs(change).toFixed(1)}% ${change <= 0 ? "less" : "more"} than last month`} icon={CreditCard} tone="blue" />
         <StatCard label="Income this month" value={formatCurrency(monthMetrics.incomeCents, currency)} detail="All recorded income" icon={Banknote} tone="green" />
         <StatCard label="Net cash flow" value={formatCurrency(monthMetrics.netCents, currency)} detail="Income minus spending" icon={Scale} tone={monthMetrics.netCents >= 0 ? "green" : "red"} />
-        <StatCard label="Monthly recurring" value={formatCurrency(recurringTotal, currency)} detail={`${recurring?.length ?? 0} active bills`} icon={CalendarClock} tone="navy" />
+        <StatCard label="Monthly recurring" value={formatCurrency(recurringTotal, currency)} detail={`${recurring.length} active bills`} icon={CalendarClock} tone="navy" />
         <StatCard label="Monthly budget" value={settings?.monthly_budget_cents == null ? "Not set" : formatCurrency(Number(settings.monthly_budget_cents), currency)} detail={settings?.monthly_budget_cents ? `${Math.max(0, 100 - (monthMetrics.expenseCents / Number(settings.monthly_budget_cents)) * 100).toFixed(0)}% remaining` : "Set a target in Settings"} icon={Landmark} tone="blue" />
       </section>
 
@@ -125,19 +119,13 @@ export default async function DashboardContent() {
           <div className="finance-card p-5 sm:p-6">
             <SectionHeading title="Upcoming bills" description="Active recurring expenses this month" action={<Link href="/protected/recurring" className="text-sm font-bold text-blue-700">Manage</Link>} />
             <div className="mt-5 space-y-3">
-              {(recurring ?? []).slice(0, 5).map((bill) => {
+              {recurring.slice(0, 5).map((bill) => {
                 const paid = paidSet.has(bill.id);
                 const overdue = !paid && bill.due_day < Number(today.slice(8, 10));
                 return <div key={bill.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><span className="grid size-10 place-items-center rounded-xl bg-white text-blue-700 shadow-sm"><CalendarClock className="size-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-slate-900">{bill.name}</p><p className="mt-0.5 text-xs text-slate-400">Due day {bill.due_day}</p></div><div className="text-right"><p className="text-sm font-extrabold">{formatCurrency(Number(bill.amount_cents), currency)}</p><p className={`text-[10px] font-bold uppercase ${paid ? "text-emerald-600" : overdue ? "text-rose-600" : "text-amber-600"}`}>{paid ? "Paid" : overdue ? "Overdue" : "Upcoming"}</p></div></div>;
               })}
-              {!recurring?.length ? <p className="py-7 text-center text-sm text-slate-400">No recurring bills configured.</p> : null}
+              {!recurring.length ? <p className="py-7 text-center text-sm text-slate-400">No recurring bills configured.</p> : null}
             </div>
-          </div>
-
-          <div className="overflow-hidden rounded-[22px] bg-gradient-to-br from-[#101b3a] to-[#1c3474] p-6 text-white shadow-xl shadow-blue-100">
-            <div className="flex items-center gap-2 text-blue-200"><Sparkles className="size-5" /><p className="text-xs font-bold uppercase tracking-[0.16em]">Latest AI insight</p></div>
-            <p className="mt-4 text-sm leading-6 text-blue-50/90">{latest ? summaryFromAnalysis(latest.analysis) ?? "Your latest analysis is ready in Reports." : "Generate a daily, weekly, or monthly analysis from Reports when you want a focused budgeting review."}</p>
-            <Link href="/protected/reports" className="mt-5 inline-flex text-sm font-bold text-white underline decoration-blue-300 underline-offset-4">Open reports</Link>
           </div>
         </div>
       </section>
