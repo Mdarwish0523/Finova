@@ -1,10 +1,9 @@
 import { connection } from "next/server";
 import Link from "next/link";
-import { ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CircleDollarSign, CreditCard, Hourglass, Landmark, Scale, Sparkles, TrendingDown } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Banknote, CalendarClock, CircleDollarSign, CreditCard, Hourglass, Landmark, Scale, TrendingDown } from "lucide-react";
 import {
   getActiveFreeTrials,
   getActiveRecurringExpenses,
-  getLatestAiReport,
   getRecurringPayments,
   getSettings,
   getTransactions,
@@ -17,31 +16,16 @@ import { CategoryChart, TrendChart } from "@/components/finance/charts";
 import { PageHeader, SectionHeading } from "@/components/finance/page-header";
 import { StatCard } from "@/components/finance/stat-card";
 
-function summaryFromAnalysis(analysis: unknown) {
-  if (
-    analysis &&
-    typeof analysis === "object" &&
-    !Array.isArray(analysis) &&
-    "summary" in analysis &&
-    typeof analysis.summary === "string"
-  ) {
-    return analysis.summary;
-  }
-
-  return null;
-}
-
 export default async function DashboardContent() {
   await connection();
   const settings = getSettings();
   const transactions = getTransactions() as Transaction[];
   const recurring = getActiveRecurringExpenses();
   const payments = getRecurringPayments();
-  const latest = getLatestAiReport();
   const freeTrials = getActiveFreeTrials();
 
   const currency = settings?.currency ?? "USD";
-  const timezone = settings?.timezone ?? process.env.APP_TIMEZONE ?? "America/New_York";
+  const timezone = settings?.timezone ?? "America/New_York";
   const today = dateInTimeZone(new Date(), timezone);
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
@@ -142,12 +126,6 @@ export default async function DashboardContent() {
               })}
               {!recurring.length ? <p className="py-7 text-center text-sm text-slate-400">No recurring bills configured.</p> : null}
             </div>
-          </div>
-
-          <div className="overflow-hidden rounded-[22px] bg-gradient-to-br from-[#101b3a] to-[#1c3474] p-6 text-white shadow-xl shadow-blue-100">
-            <div className="flex items-center gap-2 text-blue-200"><Sparkles className="size-5" /><p className="text-xs font-bold uppercase tracking-[0.16em]">Latest AI insight</p></div>
-            <p className="mt-4 text-sm leading-6 text-blue-50/90">{latest ? summaryFromAnalysis(latest.analysis) ?? "Your latest analysis is ready in Reports." : "Generate a daily, weekly, or monthly analysis from Reports when you want a focused budgeting review."}</p>
-            <Link href="/protected/reports" className="mt-5 inline-flex text-sm font-bold text-white underline decoration-blue-300 underline-offset-4">Open reports</Link>
           </div>
         </div>
       </section>
