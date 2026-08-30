@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Finova Personal Finance",
     short_name: "Finova",
-    description: "Private personal finance tracking, recurring bills, reports, and insights.",
+    description: "Local personal finance tracking for transactions, recurring bills, free trials, and reports.",
     start_url: "/protected",
     scope: "/",
     display: "standalone",
