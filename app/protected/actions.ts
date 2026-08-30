@@ -1,16 +1,27 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { requireOwnerForAction } from "@/lib/auth";
+import { z } from "zod";
+
+import { db } from "@/lib/db";
+import {
+  recurringExpenses,
+  recurringPayments,
+  settings,
+  transactions,
+} from "@/lib/db/schema";
 import { amountStringToCents } from "@/lib/finance/format";
 import {
   recurringExpenseSchema,
   settingsSchema,
   transactionSchema,
 } from "@/lib/finance/validation";
-import { z } from "zod";
 
-export type ActionResult = { ok: true; message: string } | { ok: false; message: string };
+export type ActionResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string };
 
 function value(formData: FormData, name: string) {
   return String(formData.get(name) ?? "");
@@ -18,7 +29,11 @@ function value(formData: FormData, name: string) {
 
 function safeError(error: unknown, fallback: string) {
   console.error(fallback, error);
-  if (error instanceof z.ZodError) return error.issues[0]?.message ?? fallback;
+
+  if (error instanceof z.ZodError) {
+    return error.issues[0]?.message ?? fallback;
+  }
+
   return fallback;
 }
 
@@ -29,9 +44,10 @@ function refreshFinancePages() {
   revalidatePath("/protected/reports");
 }
 
-export async function saveTransaction(formData: FormData): Promise<ActionResult> {
+export async function saveTransaction(
+  formData: FormData,
+): Promise<ActionResult> {
   try {
-    const { userId, supabase } = await requireOwnerForAction();
     const parsed = transactionSchema.parse({
       id: value(formData, "id") || undefined,
       kind: value(formData, "kind"),
@@ -43,8 +59,8 @@ export async function saveTransaction(formData: FormData): Promise<ActionResult>
       notes: value(formData, "notes"),
       recurringExpenseId: value(formData, "recurringExpenseId"),
     });
+
     const payload = {
-      user_id: userId,
       kind: parsed.kind,
       amount_cents: amountStringToCents(parsed.amount)!,
       transaction_date: parsed.transactionDate,
@@ -53,46 +69,70 @@ export async function saveTransaction(formData: FormData): Promise<ActionResult>
       description: parsed.description,
       notes: parsed.notes,
       recurring_expense_id:
-        parsed.kind === "expense" ? parsed.recurringExpenseId : null,
+        parsed.kind === "expense"
+          ? parsed.recurringExpenseId
+          : null,
       updated_at: new Date().toISOString(),
     };
 
-    const response = parsed.id
-      ? await supabase
-          .from("transactions")
-          .update(payload)
-          .eq("id", parsed.id)
-          .eq("user_id", userId)
-      : await supabase.from("transactions").insert(payload);
+    if (parsed.id) {
+      db.update(transactions)
+        .set(payload)
+        .where(eq(transactions.id, parsed.id))
+        .run();
+    } else {
+      db.insert(transactions)
+        .values({
+          id: randomUUID(),
+          ...payload,
+        })
+        .run();
+    }
 
-    if (response.error) throw response.error;
     refreshFinancePages();
-    return { ok: true, message: parsed.id ? "Transaction updated" : "Transaction added" };
+
+    return {
+      ok: true,
+      message: parsed.id
+        ? "Transaction updated"
+        : "Transaction added",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to save transaction") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to save transaction"),
+    };
   }
 }
 
-export async function deleteTransaction(id: string): Promise<ActionResult> {
+export async function deleteTransaction(
+  id: string,
+): Promise<ActionResult> {
   try {
     const transactionId = z.string().uuid().parse(id);
-    const { userId, supabase } = await requireOwnerForAction();
-    const { error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", transactionId)
-      .eq("user_id", userId);
-    if (error) throw error;
+
+    db.delete(transactions)
+      .where(eq(transactions.id, transactionId))
+      .run();
+
     refreshFinancePages();
-    return { ok: true, message: "Transaction deleted" };
+
+    return {
+      ok: true,
+      message: "Transaction deleted",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to delete transaction") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to delete transaction"),
+    };
   }
 }
 
-export async function saveRecurringExpense(formData: FormData): Promise<ActionResult> {
+export async function saveRecurringExpense(
+  formData: FormData,
+): Promise<ActionResult> {
   try {
-    const { userId, supabase } = await requireOwnerForAction();
     const parsed = recurringExpenseSchema.parse({
       id: value(formData, "id") || undefined,
       name: value(formData, "name"),
@@ -102,8 +142,8 @@ export async function saveRecurringExpense(formData: FormData): Promise<ActionRe
       active: value(formData, "active") !== "false",
       notes: value(formData, "notes"),
     });
+
     const payload = {
-      user_id: userId,
       name: parsed.name,
       amount_cents: amountStringToCents(parsed.amount)!,
       category: parsed.category,
@@ -112,52 +152,89 @@ export async function saveRecurringExpense(formData: FormData): Promise<ActionRe
       notes: parsed.notes,
       updated_at: new Date().toISOString(),
     };
-    const response = parsed.id
-      ? await supabase
-          .from("recurring_expenses")
-          .update(payload)
-          .eq("id", parsed.id)
-          .eq("user_id", userId)
-      : await supabase.from("recurring_expenses").insert(payload);
-    if (response.error) throw response.error;
+
+    if (parsed.id) {
+      db.update(recurringExpenses)
+        .set(payload)
+        .where(eq(recurringExpenses.id, parsed.id))
+        .run();
+    } else {
+      db.insert(recurringExpenses)
+        .values({
+          id: randomUUID(),
+          ...payload,
+        })
+        .run();
+    }
+
     refreshFinancePages();
-    return { ok: true, message: parsed.id ? "Recurring bill updated" : "Recurring bill added" };
+
+    return {
+      ok: true,
+      message: parsed.id
+        ? "Recurring bill updated"
+        : "Recurring bill added",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to save recurring bill") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to save recurring bill"),
+    };
   }
 }
 
-export async function toggleRecurringExpense(id: string, active: boolean): Promise<ActionResult> {
+export async function toggleRecurringExpense(
+  id: string,
+  active: boolean,
+): Promise<ActionResult> {
   try {
     const expenseId = z.string().uuid().parse(id);
-    const { userId, supabase } = await requireOwnerForAction();
-    const { error } = await supabase
-      .from("recurring_expenses")
-      .update({ active, updated_at: new Date().toISOString() })
-      .eq("id", expenseId)
-      .eq("user_id", userId);
-    if (error) throw error;
+
+    db.update(recurringExpenses)
+      .set({
+        active,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(recurringExpenses.id, expenseId))
+      .run();
+
     refreshFinancePages();
-    return { ok: true, message: active ? "Recurring bill activated" : "Recurring bill paused" };
+
+    return {
+      ok: true,
+      message: active
+        ? "Recurring bill activated"
+        : "Recurring bill paused",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to update recurring bill") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to update recurring bill"),
+    };
   }
 }
 
-export async function deleteRecurringExpense(id: string): Promise<ActionResult> {
+export async function deleteRecurringExpense(
+  id: string,
+): Promise<ActionResult> {
   try {
     const expenseId = z.string().uuid().parse(id);
-    const { userId, supabase } = await requireOwnerForAction();
-    const { error } = await supabase
-      .from("recurring_expenses")
-      .delete()
-      .eq("id", expenseId)
-      .eq("user_id", userId);
-    if (error) throw error;
+
+    db.delete(recurringExpenses)
+      .where(eq(recurringExpenses.id, expenseId))
+      .run();
+
     refreshFinancePages();
-    return { ok: true, message: "Recurring bill deleted" };
+
+    return {
+      ok: true,
+      message: "Recurring bill deleted",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to delete recurring bill") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to delete recurring bill"),
+    };
   }
 }
 
@@ -168,56 +245,187 @@ export async function markRecurringPaid(
 ): Promise<ActionResult> {
   try {
     const input = z
-      .object({ id: z.string().uuid(), periodStart: z.iso.date(), paidDate: z.iso.date() })
-      .parse({ id, periodStart, paidDate });
-    const { supabase } = await requireOwnerForAction();
-    const { error } = await supabase.rpc("mark_recurring_expense_paid", {
-      p_recurring_expense_id: input.id,
-      p_period_start: input.periodStart,
-      p_paid_date: input.paidDate,
+      .object({
+        id: z.string().uuid(),
+        periodStart: z.iso.date(),
+        paidDate: z.iso.date(),
+      })
+      .parse({
+        id,
+        periodStart,
+        paidDate,
+      });
+
+    if (!input.periodStart.endsWith("-01")) {
+      throw new Error(
+        "Recurring payment period must begin on the first day of a month",
+      );
+    }
+
+    db.transaction((tx) => {
+      const existing = tx
+        .select({
+          transaction_id:
+            recurringPayments.transaction_id,
+        })
+        .from(recurringPayments)
+        .where(
+          and(
+            eq(
+              recurringPayments.recurring_expense_id,
+              input.id,
+            ),
+            eq(
+              recurringPayments.period_start,
+              input.periodStart,
+            ),
+          ),
+        )
+        .limit(1)
+        .get();
+
+      if (existing) {
+        return existing.transaction_id;
+      }
+
+      const expense = tx
+        .select()
+        .from(recurringExpenses)
+        .where(
+          and(
+            eq(recurringExpenses.id, input.id),
+            eq(recurringExpenses.active, true),
+          ),
+        )
+        .limit(1)
+        .get();
+
+      if (!expense) {
+        throw new Error(
+          "Active recurring expense not found",
+        );
+      }
+
+      const transactionId = randomUUID();
+
+      tx.insert(transactions)
+        .values({
+          id: transactionId,
+          kind: "expense",
+          amount_cents: expense.amount_cents,
+          transaction_date: input.paidDate,
+          category: expense.category,
+          merchant: expense.name,
+          description: "Recurring payment",
+          notes: expense.notes,
+          recurring_expense_id: expense.id,
+          updated_at: new Date().toISOString(),
+        })
+        .run();
+
+      tx.insert(recurringPayments)
+        .values({
+          id: randomUUID(),
+          recurring_expense_id: expense.id,
+          period_start: input.periodStart,
+          paid_date: input.paidDate,
+          transaction_id: transactionId,
+        })
+        .run();
+
+      return transactionId;
     });
-    if (error) throw error;
+
     refreshFinancePages();
-    return { ok: true, message: "Bill marked paid and transaction created" };
+
+    return {
+      ok: true,
+      message: "Bill marked paid and transaction created",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to mark bill paid") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to mark bill paid"),
+    };
   }
 }
 
-export async function saveSettings(formData: FormData): Promise<ActionResult> {
+export async function saveSettings(
+  formData: FormData,
+): Promise<ActionResult> {
   try {
-    const { userId, supabase } = await requireOwnerForAction();
     const parsed = settingsSchema.parse({
-      startingBalance: value(formData, "startingBalance"),
-      monthlyBudget: value(formData, "monthlyBudget"),
+      startingBalance: value(
+        formData,
+        "startingBalance",
+      ),
+      monthlyBudget: value(
+        formData,
+        "monthlyBudget",
+      ),
       currency: value(formData, "currency"),
       timezone: value(formData, "timezone"),
-      aiAnalysisEnabled: formData.has("aiAnalysisEnabled"),
-      dailyAnalysisEnabled: formData.has("dailyAnalysisEnabled"),
-      weeklyAnalysisEnabled: formData.has("weeklyAnalysisEnabled"),
-      monthlyAnalysisEnabled: formData.has("monthlyAnalysisEnabled"),
+      aiAnalysisEnabled: formData.has(
+        "aiAnalysisEnabled",
+      ),
+      dailyAnalysisEnabled: formData.has(
+        "dailyAnalysisEnabled",
+      ),
+      weeklyAnalysisEnabled: formData.has(
+        "weeklyAnalysisEnabled",
+      ),
+      monthlyAnalysisEnabled: formData.has(
+        "monthlyAnalysisEnabled",
+      ),
     });
-    const { error } = await supabase.from("user_settings").upsert(
-      {
-        user_id: userId,
-        starting_balance_cents: amountStringToCents(parsed.startingBalance)!,
-        monthly_budget_cents: parsed.monthlyBudget
-          ? amountStringToCents(parsed.monthlyBudget)
-          : null,
-        currency: parsed.currency,
-        timezone: parsed.timezone,
-        ai_analysis_enabled: parsed.aiAnalysisEnabled,
-        daily_analysis_enabled: parsed.dailyAnalysisEnabled,
-        weekly_analysis_enabled: parsed.weeklyAnalysisEnabled,
-        monthly_analysis_enabled: parsed.monthlyAnalysisEnabled,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
-    if (error) throw error;
+
+    const payload = {
+      starting_balance_cents:
+        amountStringToCents(parsed.startingBalance)!,
+
+      monthly_budget_cents: parsed.monthlyBudget
+        ? amountStringToCents(parsed.monthlyBudget)
+        : null,
+
+      currency: parsed.currency,
+      timezone: parsed.timezone,
+
+      ai_analysis_enabled:
+        parsed.aiAnalysisEnabled,
+
+      daily_analysis_enabled:
+        parsed.dailyAnalysisEnabled,
+
+      weekly_analysis_enabled:
+        parsed.weeklyAnalysisEnabled,
+
+      monthly_analysis_enabled:
+        parsed.monthlyAnalysisEnabled,
+
+      updated_at: new Date().toISOString(),
+    };
+
+    db.insert(settings)
+      .values({
+        id: 1,
+        ...payload,
+      })
+      .onConflictDoUpdate({
+        target: settings.id,
+        set: payload,
+      })
+      .run();
+
     revalidatePath("/protected", "layout");
-    return { ok: true, message: "Settings saved" };
+
+    return {
+      ok: true,
+      message: "Settings saved",
+    };
   } catch (error) {
-    return { ok: false, message: safeError(error, "Unable to save settings") };
+    return {
+      ok: false,
+      message: safeError(error, "Unable to save settings"),
+    };
   }
 }

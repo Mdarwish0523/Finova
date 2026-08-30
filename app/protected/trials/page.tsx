@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/finance/page-header";
 import { FreeTrialsManager } from "@/components/finance/free-trials-manager";
@@ -7,6 +8,7 @@ import { dateInTimeZone } from "@/lib/finance/dates";
 export const metadata = { title: "Free Trials" };
 
 async function TrialsContent() {
+  await connection();
   const { userId, supabase } = await requireOwner();
   const [{ data: settings }, { data: trials, error }] = await Promise.all([
     supabase.from("user_settings").select("timezone").eq("user_id", userId).maybeSingle(),

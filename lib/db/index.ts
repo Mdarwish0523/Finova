@@ -8,11 +8,16 @@ import * as schema from "./schema";
 const dataDirectory = path.join(process.cwd(), "data");
 mkdirSync(dataDirectory, { recursive: true });
 
-const databasePath = path.join(dataDirectory, "finova.db");
+const databasePath = path.join(
+  dataDirectory,
+  "finova.db",
+);
 
 const sqlite = new BetterSqlite3(databasePath);
 
-sqlite.pragma("journal_mode = WAL");
+// Allow another Next.js worker to finish a brief database operation
+// instead of immediately throwing SQLITE_BUSY.
+sqlite.pragma("busy_timeout = 10000");
 sqlite.pragma("foreign_keys = ON");
 
 sqlite.exec(`
@@ -129,6 +134,8 @@ sqlite.exec(`
   VALUES (1);
 `);
 
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(sqlite, {
+  schema,
+});
 
 export { sqlite };

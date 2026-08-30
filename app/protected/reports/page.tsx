@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Activity, ArrowDownRight, ArrowUpRight, CalendarDays, CircleDollarSign, Hash, ReceiptText, Scale, Sparkles } from "lucide-react";
@@ -15,6 +16,7 @@ export const metadata = { title: "Reports" };
 type Params = { period?: string; anchor?: string; start?: string; end?: string };
 
 async function ReportsContent({ searchParams }: { searchParams: Promise<Params> }) {
+  await connection();
   const params = await searchParams;
   const { userId, supabase } = await requireOwner();
   const { data: settings } = await supabase.from("user_settings").select("currency, timezone").eq("user_id", userId).maybeSingle();
