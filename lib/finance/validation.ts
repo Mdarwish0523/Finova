@@ -57,8 +57,4 @@ export const settingsSchema = z.object({
   monthlyBudget: z.union([z.literal(""), amountSchema]),
   currency: z.string().refine((value) => CURRENCIES.includes(value)),
   timezone: z.string().refine((value) => TIME_ZONES.includes(value)),
-  aiAnalysisEnabled: z.boolean(),
-  dailyAnalysisEnabled: z.boolean(),
-  weeklyAnalysisEnabled: z.boolean(),
-  monthlyAnalysisEnabled: z.boolean(),
 });
