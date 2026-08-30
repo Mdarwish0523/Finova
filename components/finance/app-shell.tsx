@@ -51,17 +51,12 @@ export function AppShell({
             );
           })}
         </nav>
-        <div className="mt-auto rounded-[22px] bg-gradient-to-br from-slate-950 to-blue-950 p-4 text-white">
-          <p className="text-sm font-bold">Local by design</p>
-          <p className="mt-1 text-xs leading-5 text-blue-100/70">Your finance data is stored locally in your Finova SQLite database.</p>
-        </div>
       </aside>
 
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-blue-100/70 bg-white/90 px-4 backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-30 flex h-16 items-center border-b border-blue-100/70 bg-white/90 px-4 backdrop-blur-xl lg:hidden">
         <Link href="/protected" className="flex items-center gap-2.5 font-extrabold tracking-tight text-slate-950">
           <span className="grid size-9 place-items-center rounded-xl bg-blue-700 text-white"><WalletCards className="size-5" /></span>Finova
         </Link>
-        <span className="rounded-full bg-blue-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-blue-700">Local</span>
       </header>
 
       <main className="min-w-0 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:ml-64 lg:pb-10">
