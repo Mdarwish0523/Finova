@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { Database, Download, MonitorSmartphone, Smartphone } from "lucide-react";
 import { getSettings } from "@/lib/db/queries";
@@ -7,6 +8,7 @@ import { SettingsForm } from "@/components/finance/settings-form";
 export const metadata = { title: "Settings" };
 
 async function SettingsContent() {
+  await connection();
   const data = getSettings();
 
   return (
