@@ -355,53 +355,20 @@ export async function saveSettings(
 ): Promise<ActionResult> {
   try {
     const parsed = settingsSchema.parse({
-      startingBalance: value(
-        formData,
-        "startingBalance",
-      ),
-      monthlyBudget: value(
-        formData,
-        "monthlyBudget",
-      ),
+      startingBalance: value(formData, "startingBalance"),
+      monthlyBudget: value(formData, "monthlyBudget"),
       currency: value(formData, "currency"),
       timezone: value(formData, "timezone"),
-      aiAnalysisEnabled: formData.has(
-        "aiAnalysisEnabled",
-      ),
-      dailyAnalysisEnabled: formData.has(
-        "dailyAnalysisEnabled",
-      ),
-      weeklyAnalysisEnabled: formData.has(
-        "weeklyAnalysisEnabled",
-      ),
-      monthlyAnalysisEnabled: formData.has(
-        "monthlyAnalysisEnabled",
-      ),
     });
 
     const payload = {
       starting_balance_cents:
         amountStringToCents(parsed.startingBalance)!,
-
       monthly_budget_cents: parsed.monthlyBudget
         ? amountStringToCents(parsed.monthlyBudget)
         : null,
-
       currency: parsed.currency,
       timezone: parsed.timezone,
-
-      ai_analysis_enabled:
-        parsed.aiAnalysisEnabled,
-
-      daily_analysis_enabled:
-        parsed.dailyAnalysisEnabled,
-
-      weekly_analysis_enabled:
-        parsed.weeklyAnalysisEnabled,
-
-      monthly_analysis_enabled:
-        parsed.monthlyAnalysisEnabled,
-
       updated_at: new Date().toISOString(),
     };
 
