@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/finance-analysis",
+      "schedule": "15 9 * * *"
+    },
+    {
+      "path": "/api/cron/trial-reminders",
+      "schedule": "30 9 * * *"
+    }
+  ]
+}
