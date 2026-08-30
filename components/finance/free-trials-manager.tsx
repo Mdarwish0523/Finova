@@ -2,12 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Bell, CalendarDays, CreditCard, Edit3, LoaderCircle, Plus, RotateCcw, Trash2, X, XCircle } from "lucide-react";
-import type { Tables } from "@/lib/database.types";
+import type { freeTrials } from "@/lib/db/schema";
 import { deleteFreeTrial, saveFreeTrial, setFreeTrialStatus } from "@/app/protected/trials/actions";
 import { formatDate } from "@/lib/finance/format";
 import { shiftDate } from "@/lib/finance/dates";
 
-type Trial = Tables<"free_trials">;
+type Trial = typeof freeTrials.$inferSelect;
 
 function daysFrom(start: string, end: string) {
   return Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86_400_000);
@@ -58,9 +58,10 @@ function TrialForm({ trial, today, onClose }: { trial: Trial | null; today: stri
           <label className="field-label sm:col-span-2">Card used<input className="field-input mt-2" name="cardLabel" required maxLength={120} placeholder="Apple Card, Amex ending 1234, PayPal…" defaultValue={trial?.card_label} /><span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Use a label or last four digits only. Never enter a full card number, CVV, or expiration date.</span></label>
           <label className="field-label sm:col-span-2">Notes <span className="font-normal text-slate-400">(optional)</span><textarea className="field-input mt-2 min-h-24 py-3" name="notes" maxLength={500} defaultValue={trial?.notes ?? ""} /></label>
           <div className="space-y-3 rounded-2xl border border-slate-100 p-4 sm:col-span-2">
-            <p className="text-sm font-extrabold text-slate-800">Reminders</p>
-            <label className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-600"><span>Notify 2 days before</span><input className="size-5 accent-blue-700" type="checkbox" name="remindTwoDays" defaultChecked={trial?.remind_two_days ?? true} /></label>
-            <label className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-600"><span>Notify 1 day before</span><input className="size-5 accent-blue-700" type="checkbox" name="remindOneDay" defaultChecked={trial?.remind_one_day ?? true} /></label>
+            <p className="text-sm font-extrabold text-slate-800">Reminder flags</p>
+            <p className="text-xs leading-5 text-slate-400">Stored locally for reference. Finova does not send cloud push notifications.</p>
+            <label className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-600"><span>2 days before</span><input className="size-5 accent-blue-700" type="checkbox" name="remindTwoDays" defaultChecked={trial?.remind_two_days ?? true} /></label>
+            <label className="flex items-center justify-between gap-4 text-sm font-semibold text-slate-600"><span>1 day before</span><input className="size-5 accent-blue-700" type="checkbox" name="remindOneDay" defaultChecked={trial?.remind_one_day ?? true} /></label>
           </div>
           {message ? <p role="status" className="text-sm font-semibold text-slate-500 sm:col-span-2">{message}</p> : null}
           <button className="primary-button sm:col-span-2" disabled={pending}>{pending ? <LoaderCircle className="size-4 animate-spin" /> : null}{pending ? "Saving…" : "Save free trial"}</button>
@@ -80,7 +81,7 @@ function TrialCard({ trial, today, pending, onEdit, onStatus, onDelete }: { tria
       <p className="mt-1 text-sm font-semibold text-slate-500">{formatDate(trial.charge_date, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>
       <div className="mt-5 space-y-3 rounded-2xl bg-slate-50 p-4 text-sm">
         <p className="flex items-center gap-2 text-slate-600"><CreditCard className="size-4 text-blue-600" /><span className="truncate">{trial.card_label}</span></p>
-        <p className="flex items-center gap-2 text-slate-600"><Bell className="size-4 text-blue-600" /><span>{reminderText === "Off" ? "Reminders off" : `${reminderText} before`}</span></p>
+        <p className="flex items-center gap-2 text-slate-600"><Bell className="size-4 text-blue-600" /><span>{reminderText === "Off" ? "Reminder flags off" : `${reminderText} before`}</span></p>
       </div>
       {trial.notes ? <p className="mt-4 line-clamp-2 text-xs leading-5 text-slate-400">{trial.notes}</p> : null}
       <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
